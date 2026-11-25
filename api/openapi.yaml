@@ -1,0 +1,265 @@
+# Шаблон спецификации API проекта «Автомат печати фото из ВКонтакте».
+# Артефакт: ART-009 · Источник: ЛР №8.
+# Заполните описания операций, пути и схемы данными вашего проекта.
+openapi: 3.1.0
+info:
+  title: Автомат печати фото из ВКонтакте — API
+  version: 0.1.0
+  description: |
+    Контракты интерфейсов между веб-интерфейсом пользователя (телефон),
+    серверной частью и модулем управления принтером автомата.
+servers:
+  - url: https://{host}/api/v1
+    description: Основной сервер API
+    variables:
+      host:
+        default: example.local
+tags:
+  - name: auth
+    description: Авторизация через ВКонтакте
+  - name: photos
+    description: Альбомы и фото пользователя
+  - name: orders
+    description: Заказы на печать
+  - name: payments
+    description: Оплата заказов
+  - name: print
+    description: Задания печати автомата
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: [Начать авторизацию через ВКонтакте]
+      description: [Описать сценарий OAuth-входа.]
+      operationId: startLogin
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: [Текущий пользователь]
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /photos:
+    get:
+      tags: [photos]
+      summary: [Список альбомов и фото пользователя]
+      description: [Описать источник данных (ВКонтакте API) и лимиты выборки.]
+      operationId: listPhotos
+      parameters:
+        - name: albumId
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Photo'
+  /orders:
+    post:
+      tags: [orders]
+      summary: [Создать заказ на печать]
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderDraft'
+      responses:
+        '201':
+          description: Заказ создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+    get:
+      tags: [orders]
+      summary: [История заказов пользователя]
+      operationId: listOrders
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+  /orders/{orderId}:
+    get:
+      tags: [orders]
+      summary: [Статус заказа]
+      operationId: getOrder
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Заказ не найден
+  /payments:
+    post:
+      tags: [payments]
+      summary: [Оплатить заказ]
+      description: [Описать выбранный сервис приёма платежей.]
+      operationId: payOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Платёж принят
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+  /print/tasks/{taskId}:
+    get:
+      tags: [print]
+      summary: [Статус задания печати]
+      description: [Используется автоматом и интерфейсом пользователя.]
+      operationId: getPrintTask
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrintTask'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      description: [Пользователь системы, авторизованный через ВКонтакте.]
+      properties:
+        id:
+          type: string
+        vkId:
+          type: string
+        displayName:
+          type: string
+    Session:
+      type: object
+      description: [Сессия пользователя после входа.]
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    Photo:
+      type: object
+      description: [Фото из ВКонтакте, доступное для печати.]
+      properties:
+        id:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+        albumId:
+          type: string
+    OrderDraft:
+      type: object
+      description: [Черновик заказа перед оплатой.]
+      properties:
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+        printFormat:
+          type: string
+          enum: [10x15, 13x18, 15x21]
+        copies:
+          type: integer
+    Order:
+      type: object
+      description: [Заказ пользователя.]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [new, paid, printing, done, cancelled]
+        totalAmount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+    PaymentRequest:
+      type: object
+      description: [Запрос на оплату заказа.]
+      properties:
+        orderId:
+          type: string
+        method:
+          type: string
+          enum: [card, sbp, qr]
+    Payment:
+      type: object
+      description: [Платёж по заказу.]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, failed]
+    PrintTask:
+      type: object
+      description: [Задание печати для автомата.]
+      properties:
+        id:
+          type: string
+        orderId:
+          type: string
+        status:
+          type: string
+          enum: [queued, printing, printed, failed]
+        printerId:
+          type: string
+security:
+  - bearerAuth: []
